@@ -1,0 +1,59 @@
+# Ignore venv
+venv/
+venv.bak/
+# Ignore FFMPEG
+procesos/utils/ffmpeg/ffmpeg-master-latest-win64-gpl/bin/*.exe
+# Ignore credentials
+credentials/*.json
+# Ignorar Logs
+logs/
+# Ignorar Songs-Files
+songs-files/
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+# Django stuff:
+*.log
+*.pot
+*.pyc
+*.pyo
+*.pyd
+# Django static files
+staticfiles/
+static/
+# VSCode settings
+.vscode/
+# macOS
+.DS_Store
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+# Pytest
+.cache/
+.pytest_cache/
+# Jupyter Notebook
+.ipynb_checkpoints
+# PyCharm
+.idea/
+# Celery
+celerybeat-schedule
+celerybeat.pid
+# Gunicorn
+gunicorn.pid
+# Local PostgreSQL
+*.psql
+*.pgsql
+*.pg_dump
+# Docker
+*.pid
+*.seed
+*.bak
+*.swp
+.dockerignore
+docker-compose.override.yml
