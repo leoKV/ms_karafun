@@ -26,6 +26,8 @@ def download_file(file, dest_dir):
         service = authenticate_drive()
         file_id = file['id']
         file_name = file['name']
+        if file_name in ['render_kfn_p1.mp4', 'render_kfn_p1_ensayo.mp4']:
+            return
         drive_modified = datetime.strptime(file['modifiedTime'], "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=timezone.utc)
         local_path = os.path.join(dest_dir, file_name)
         if os.path.exists(local_path):
