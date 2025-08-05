@@ -275,47 +275,7 @@ class KaraokeFunForm:
         # Concatenar todo con saltos de línea
         general = "\n".join(ldato) + "\n"
         return general
-    
-    def _parse(self, font_filename: str) -> bool:
-        try:
-            self.m_file = open(font_filename, 'rb')
-            # Leer firma de archivo
-            signature = self._read_bytes(4).decode('utf-8')
-            if signature != "KFNB":
-                return False
-            # Leer encabezado
-            while True:
-                signature = self._read_bytes(4).decode('utf-8')
-                type_ = self._read_byte()
-                len_or_value = self._read_dword()
-                print(f"signature: {signature} type: {type_} len_or_value: {len_or_value}")
-                if type_ == 1:
-                    pass
-                elif type_ == 2:
-                    buf = self._read_bytes(len_or_value)
-                if signature == "ENDH":
-                    break
-            # Leer número de archivos
-            num_files = self._read_dword()
-            for _ in range(num_files):
-                filename_len = self._read_dword()
-                filename_bytes = self._read_bytes(filename_len)
-                filename = filename_bytes.decode('utf-8')
-                file_type = self._read_dword()
-                file_length1 = self._read_dword()
-                file_offset = self._read_dword()
-                file_length2 = self._read_dword()
-                file_flags = self._read_dword()
-                print(
-                    f"File {filename}, type: {file_type}, length1: {file_length1}, "
-                    f"length2: {file_length2}, offset: {file_offset}, flags: {file_flags}"
-                )
-            print(f"Directory ends at offset {self.m_file.tell()}")
-            return True
-        except Exception as e:
-            logger.error("[ERROR] No se pudo analizar el archivo .kfn: %s", str(e))
-            return False
-    
+        
     def _read_byte(self) -> int:
         byte = self.m_file.read(1)
         if not byte:
