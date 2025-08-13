@@ -111,12 +111,56 @@ def search_kfn(song_key: str, filename: str = "kara_fun.kfn") -> dict:
 def upload_file(service, local_path, file_id):
     try:
         media = MediaFileUpload(local_path, resumable=True)
-        updated_file = service.files().update(fileId=file_id, media_body=media).execute()
+        service.files().update(fileId=file_id, media_body=media).execute()
         logger.info("[INFO] Archivo %s actualizado en Google Drive.", os.path.basename(local_path))
         print(f"[INFO] Archivo {os.path.basename(local_path)} actualizado en Google Drive.")
     except Exception as e:
         logger.error("[ERROR] Error al subir %s: %s", os.path.basename(local_path), str(e))
         print(f"[ERROR] Error al subir {os.path.basename(local_path)}: {str(e)}")
+
+def upload_kfn(song_key: str) -> dict:
+    try:
+        service = authenticate_drive()
+        # Paso 1: obtener carpeta padre (kia_songs)
+        parent_folder_id = CancionRepository().get_parent_folder()
+        if not parent_folder_id:
+            return {"success": False, "message": "No se pudo obtener la carpeta principal 'kia_songs'."}
+        # Paso 2: buscar carpeta de la canción
+        query = f"'{parent_folder_id}' in parents and name = '{song_key}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
+        response = service.files().list(q=query, spaces='drive', fields='files(id, name)').execute() # pylint: disable=no-member
+        folders = response.get('files', [])
+        if not folders:
+            return {"success": False, "message": f"No se encontró la carpeta con key '{song_key}' en Google Drive."}
+        folder_id = folders[0]['id']
+        # Paso 3: ruta local del archivo
+        dest_dir = os.path.join(config.get_path_main(), song_key)
+        local_path = os.path.join(dest_dir, "kara_fun.kfn")
+        if not os.path.exists(local_path):
+            return {"success": False, "message": f"No se encontró el archivo local kara_fun.kfn para la key '{song_key}'."}
+        # Paso 4: buscar archivo kara_fun.kfn en Drive
+        query = f"'{folder_id}' in parents and name = 'kara_fun.kfn' and trashed = false"
+        response = service.files().list(q=query, spaces='drive', fields='files(id, name)').execute() # pylint: disable=no-member
+        files = response.get('files', [])
+        if files:
+            # Ya existe en Drive → actualizar
+            file_id = files[0]['id']
+            upload_file(service, local_path, file_id)
+        else:
+            # No existe → crear nuevo
+            file_metadata = {
+                'name': 'kara_fun.kfn',
+                'parents': [folder_id]
+            }
+            media = MediaFileUpload(local_path, resumable=True)
+            service.files().create(body=file_metadata, media_body=media, fields='id').execute() # pylint: disable=no-member
+            msg = f"[INFO] Archivo kara_fun.kfn subido a la carpeta {song_key}"
+            logger.info(msg)
+            print(msg)
+        return {"success": True, "message": f"Archivo kara_fun.kfn subido para la key '{song_key}'."}
+    except HttpError as error:
+        return {"success": False, "message": f"Error de conexión con Google Drive: {error}"}
+    except Exception as e:
+        return {"success": False, "message": str(e)}
 
 # PRUEBAS
 def upload_file_to_folder(file_path: str, folder_id: str, filename: str = None) -> str:

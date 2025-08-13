@@ -5,7 +5,7 @@ import json
 from ms_karafun import config
 from concurrent.futures import ThreadPoolExecutor
 from karafun_manager.repositories.cancion_repository import CancionRepository
-from karafun_manager.utils.drive_manager import search_kfn, download_all_files
+from karafun_manager.utils.drive_manager import search_kfn, download_all_files, upload_kfn
 from karafun_manager.models.Cancion import Cancion
 from karafun_manager.services.KaraokeFUNForm import KaraokeFunForm
 import logging
@@ -33,6 +33,29 @@ def sync_drive(request):
                 for future in futures:
                     resultados.append(future.result())
             return JsonResponse({'success': True, 'message': '¡Archivos Sincronizados Correctamente!'})
+        except Exception as e:
+            print(f"[EXCEPTION] {e}")
+            return JsonResponse({'success': False, 'message': str(e)})
+    return JsonResponse({'success': False, 'message': 'Método no permitido'})
+
+@csrf_exempt
+def subir_karafun(request):
+    if request.method == 'POST':
+        try:
+            body = json.loads(request.body)
+            keys = body.get('keys', [])
+            if not isinstance(keys, list):
+                return JsonResponse({'success': False, 'message': 'Formato inválido: se esperaba una lista de keys'})
+            cantidad = len(keys)
+            resultados = []
+            def worker(key):
+                result = upload_kfn(key)
+                return {'key': key, 'resultado': result}
+            with ThreadPoolExecutor(max_workers= cantidad) as executor:
+                futures = [executor.submit(worker, key) for key in keys]
+                for future in futures:
+                    resultados.append(future.result())
+            return JsonResponse({'success': True, 'message': '¡Archivo(s) KFN Subido(s) a Google Drive!'})
         except Exception as e:
             print(f"[EXCEPTION] {e}")
             return JsonResponse({'success': False, 'message': str(e)})
