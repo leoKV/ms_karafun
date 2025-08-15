@@ -6,5 +6,7 @@ urlpatterns = [
     path('abrirKarafun/', views.abrir_karafun),
     path('syncDrive/', views.sync_drive),
     path('crearKarafun/', views.crear_karafun),
-    path('subirKarafun/', views.subir_karafun)
+    path('subirKarafun/', views.subir_karafun),
+    path('downloadKaraoke/', views.download_karaoke),
+    path('deleteKaraoke/', views.delete_karaoke)
 ]

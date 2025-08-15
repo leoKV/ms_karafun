@@ -1,11 +1,12 @@
 import os
+import shutil
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 import json
 from ms_karafun import config
 from concurrent.futures import ThreadPoolExecutor
 from karafun_manager.repositories.cancion_repository import CancionRepository
-from karafun_manager.utils.drive_manager import search_kfn, download_all_files, upload_kfn
+from karafun_manager.utils.drive_manager import search_kfn, download_all_files, upload_kfn, download_k
 from karafun_manager.models.Cancion import Cancion
 from karafun_manager.services.KaraokeFUNForm import KaraokeFunForm
 import logging
@@ -124,6 +125,48 @@ def crear_karafun(request):
                 })
             else:  # Error en la generación
                 return JsonResponse({'success': False, 'message': result[1]})
+        except Exception as e:
+            print(f"[EXCEPTION] {e}")
+            return JsonResponse({'success': False, 'message': str(e)})
+    return JsonResponse({'success': False, 'message': 'Método no permitido'})
+
+@csrf_exempt
+def download_karaoke(request):
+    if request.method == 'POST':
+        try:
+            body = json.loads(request.body)
+            key = body.get('key')
+            drive_id = body.get('drive_id')
+            tipo = body.get('tipo')
+            result = download_k(key, drive_id, tipo)
+            return JsonResponse(result)
+        except Exception as e:
+            print(f"[EXCEPTION] {e}")
+            return JsonResponse({'success': False, 'message': str(e)})
+    return JsonResponse({'success': False, 'message': 'Método no permitido'})
+
+@csrf_exempt
+def delete_karaoke(request):
+    if request.method == 'POST':
+        try:
+            body = json.loads(request.body)
+            key = body.get('key')
+            tipo = body.get('tipo')
+            key_dir = os.path.join(config.get_path_main(), key)
+            karaoke_dir = ''
+            if tipo == 1:
+                karaoke_dir = 'karaoke_final'
+            elif tipo == 2:
+                karaoke_dir = 'ensayo'
+            dest_dir = os.path.join(key_dir, karaoke_dir)
+            if os.path.exists(dest_dir):
+                shutil.rmtree(dest_dir)
+                msg = "Archivo Eliminado Localmente."
+                result = {"success": True, "message": msg}
+            else:
+                msg = "La carpeta no existe."
+                result = {"success": False, "message": msg}
+            return JsonResponse(result)
         except Exception as e:
             print(f"[EXCEPTION] {e}")
             return JsonResponse({'success': False, 'message': str(e)})

@@ -1,6 +1,9 @@
 from datetime import datetime, timezone
 import io
 import os
+import platform
+import subprocess
+from django.conf import settings
 from googleapiclient.errors import HttpError
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
@@ -107,7 +110,7 @@ def search_kfn(song_key: str, filename: str = "kara_fun.kfn") -> dict:
         logger.error("[ERROR] Error al abrir el archivo KFN: %s", str(e))
         print(f"[ERROR] Error al abrir el archivo KFN: {str(e)}")
         return {"success": False, "message": str(e)}
-
+    
 def upload_file(service, local_path, file_id):
     try:
         media = MediaFileUpload(local_path, resumable=True)
@@ -161,6 +164,60 @@ def upload_kfn(song_key: str) -> dict:
         return {"success": False, "message": f"Error de conexión con Google Drive: {error}"}
     except Exception as e:
         return {"success": False, "message": str(e)}
+
+def download_k(song_key: str, drive_id:str, tipo:int) -> dict:
+    try:
+        key_dir = os.path.join(config.get_path_main(), song_key)
+        karaoke_dir = ''
+        if tipo == 1:
+            karaoke_dir = 'karaoke_final'
+        elif tipo == 2:
+            karaoke_dir = 'ensayo'
+        dest_dir = os.path.join(key_dir, karaoke_dir)
+        os.makedirs(dest_dir, exist_ok=True)
+        service = authenticate_drive()
+        # 1. Obtener nombre del archivo en Drive
+        file_info = service.files().get(fileId=drive_id, fields="name").execute() # pylint: disable=no-member
+        original_name = file_info.get("name", "karaoke.mp4")
+        final_path = os.path.join(dest_dir, original_name)
+        if os.path.exists(final_path):
+            abrir_video(final_path)
+            msg = "Abriendo Archivo."
+            return {"success": True, "message": msg}
+        # 2. Descargar el archivo
+        request = service.files().get_media(fileId=drive_id) # pylint: disable=no-member
+        done = False
+        fh = io.FileIO(final_path, 'wb')
+        downloader = MediaIoBaseDownload(fh, request)
+        while not done:
+            done = downloader.next_chunk()
+        msg = f"[INFO] Archivo Descargado en {final_path}"
+        logger.info(msg)
+        print(msg)
+        # 3. Abrir el archivo en el reproductor predeterminado
+        abrir_video(final_path)
+        msg = "Archivo Descargado."
+        return {"success": True, "message": msg}
+    except Exception as e:
+        msg = f"[ERROR] Error al descargar Karaoke: {str(e)}"
+        logger.error(msg)
+        print(msg)
+        return {"success": False, "message": str(e)}
+    
+def abrir_video(final_path):
+    sistema = platform.system()
+    try:
+        if sistema == "Windows":
+            os.startfile(final_path)
+        elif sistema == "Darwin":
+            subprocess.run(["open", final_path])
+        else:
+            subprocess.run(["xdg-open", final_path])
+        msg = f"[INFO] Reproduciendo: {final_path}"
+        logger.info(msg)
+        print(msg)
+    except Exception as e:
+        print(f"[ERROR] No se pudo reproducir el video: {e}")
 
 # PRUEBAS
 def upload_file_to_folder(file_path: str, folder_id: str, filename: str = None) -> str:

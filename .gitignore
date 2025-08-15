@@ -57,3 +57,7 @@ gunicorn.pid
 *.swp
 .dockerignore
 docker-compose.override.yml
+# Env
+.env
+# Settings
+ms_procesos/settings.py
