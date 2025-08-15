@@ -1,5 +1,7 @@
 import os
+from pathlib import Path
 import shutil
+import zipfile
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 import json
@@ -114,6 +116,8 @@ def crear_karafun(request):
                 key=key,
                 path_imagen_cliente=path_imagen_cliente
             )
+            if not verificar_recursos():
+                return JsonResponse({'success': False, 'message': 'No se pudieron verificar los recursos.'})
             # Crear Karafun.
             kfun = KaraokeFunForm(cancion)
             result = kfun.genera_archivo_kfun()
@@ -129,6 +133,36 @@ def crear_karafun(request):
             print(f"[EXCEPTION] {e}")
             return JsonResponse({'success': False, 'message': str(e)})
     return JsonResponse({'success': False, 'message': 'Método no permitido'})
+
+def verificar_recursos():
+    try:
+        path_fondos = config.get_path_img_fondo()
+        if os.path.exists(path_fondos):
+            return True
+        path_resources = os.path.join(os.getcwd(), "resources")
+        path_zip = os.path.join(path_resources, "resources.zip")
+        path_d = Path(config.get_path_img_fondo())
+        path_destino = path_d.parent
+        if not os.path.exists(path_zip):
+            msg = f"[ERROR] No se encontró el archivo: {path_zip}"
+            logger.error(msg)
+            print(msg)
+            return False
+        msg = f"[INFO] Extrayendo {path_zip} a {path_destino}..."
+        logger.info(msg)
+        print(msg)
+        with zipfile.ZipFile(path_zip, 'r') as zip_ref:
+            zip_ref.extractall(path_destino)
+        shutil.rmtree(path_resources)
+        msg = "[INFO] Extracción completada y archivo ZIP eliminado."
+        logger.info(msg)
+        print(msg)
+        return True
+    except Exception as e:
+        msg = f"[ERROR] Fallo al verificar/extraer recursos: {e}"
+        logger.error(msg)
+        print(msg)
+        return False
 
 @csrf_exempt
 def download_karaoke(request):

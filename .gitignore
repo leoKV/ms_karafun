@@ -60,4 +60,4 @@ docker-compose.override.yml
 # Env
 .env
 # Settings
-ms_procesos/settings.py
+ms_karafun/settings.py
