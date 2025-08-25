@@ -1,4 +1,5 @@
 import os
+import struct
 from pathlib import Path
 import shutil
 import zipfile
@@ -9,6 +10,8 @@ from ms_karafun import config
 from concurrent.futures import ThreadPoolExecutor
 from karafun_manager.repositories.cancion_repository import CancionRepository
 from karafun_manager.utils.drive_manager import search_kfn, download_all_files, upload_kfn, download_k
+from karafun_manager.utils.audacity import open_audacity
+from karafun_manager.utils.karafun_studio import manipular_kfn, recrear_kfn
 from karafun_manager.models.Cancion import Cancion
 from karafun_manager.services.KaraokeFUNForm import KaraokeFunForm
 import logging
@@ -200,6 +203,51 @@ def delete_karaoke(request):
             else:
                 msg = "La carpeta no existe."
                 result = {"success": False, "message": msg}
+            return JsonResponse(result)
+        except Exception as e:
+            print(f"[EXCEPTION] {e}")
+            return JsonResponse({'success': False, 'message': str(e)})
+    return JsonResponse({'success': False, 'message': 'Método no permitido'})
+
+@csrf_exempt
+def abrir_audacity(request):
+    if request.method == 'POST':
+        try:
+            body = json.loads(request.body)
+            key = body.get('key')
+            result = open_audacity(key)
+            return JsonResponse(result)
+        except Exception as e:
+            print(f"[EXCEPTION] {e}")
+            return JsonResponse({'success': False, 'message': str(e)})
+    return JsonResponse({'success': False, 'message': 'Método no permitido'})
+
+@csrf_exempt
+def manipular_karafun(request):
+    if request.method == 'POST':
+        try:
+            body = json.loads(request.body)
+            key = body.get('key')
+            result = manipular_kfn(key)
+            return JsonResponse(result)
+        except Exception as e:
+            print(f"[EXCEPTION] {e}")
+            return JsonResponse({'success': False, 'message': str(e)})
+    return JsonResponse({'success': False, 'message': 'Método no permitido'})
+
+
+@csrf_exempt
+def recrear_karafun(request):
+    if request.method == 'POST':
+        try:
+            body = json.loads(request.body)
+            key = body.get('key')
+            archivos = body.get('archivos', [])
+            if not isinstance(archivos, list):
+                return JsonResponse({'success': False, 'message': 'Formato inválido: se esperaba una lista de archivos.'})
+            audio = body.get('audio')
+            fondo = body.get('fondo')
+            result = recrear_kfn(key, archivos, audio, fondo)
             return JsonResponse(result)
         except Exception as e:
             print(f"[EXCEPTION] {e}")

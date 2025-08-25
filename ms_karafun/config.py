@@ -23,5 +23,8 @@ def get_path_karafun():
 def get_path_img_fondo():
     return env("PATH_IMG_FONDO", default="").strip()
 
+def get_path_audacity():
+    return env("PATH_AUDACITY", default="").strip()
+
 def reload_env():
     environ.Env.read_env(ENV_PATH, overwrite=True)

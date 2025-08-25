@@ -8,5 +8,8 @@ urlpatterns = [
     path('crearKarafun/', views.crear_karafun),
     path('subirKarafun/', views.subir_karafun),
     path('downloadKaraoke/', views.download_karaoke),
-    path('deleteKaraoke/', views.delete_karaoke)
+    path('deleteKaraoke/', views.delete_karaoke),
+    path('abrirAudacity/', views.abrir_audacity),
+    path('manipularKarafun/', views.manipular_karafun),
+    path('recrearKarafun/', views.recrear_karafun)
 ]
