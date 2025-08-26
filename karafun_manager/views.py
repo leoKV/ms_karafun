@@ -74,6 +74,9 @@ def abrir_karafun(request):
             body = json.loads(request.body)
             key = body.get('key')
             result = search_kfn(key)
+            if not result.get("success") and "No hay KFN" in result.get("message", ""):
+                download_all_files(key)
+                return JsonResponse({"success": False, "message": "No hay KFN."})
             return JsonResponse(result)
         except Exception as e:
             print(f"[EXCEPTION] {e}")
