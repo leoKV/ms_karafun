@@ -1,4 +1,5 @@
 import os
+import platform
 import subprocess
 from ms_karafun import config
 import logging
@@ -34,6 +35,33 @@ def open_audacity(key: str) -> dict:
         return {"success": True, "message": msg}
     except Exception as e:
         msg = f"No se pudo lanzar Audacity: {e}"
+        logger.error("[ERROR] %s", msg)
+        print(f"[ERROR] {msg}")
+        return {"success": False, "message": msg}
+    
+
+
+def open_carpeta(key: str) -> dict:
+    dest_dir = os.path.join(config.get_path_main(), key)
+    if not os.path.exists(dest_dir):
+        msg = f"No se encontro la carpeta: {dest_dir}"
+        logger.error("[ERROR] %s", msg)
+        print(f"[ERROR] {msg}")
+        return {"success": False, "message": msg}
+    try:
+        system = platform.system()
+        if system == "Windows":
+            os.startfile(dest_dir)
+        elif system == "Darwin":
+            subprocess.Popen(["open", dest_dir])
+        else:  # Linux (GNOME, KDE, XFCE, etc.)
+            subprocess.Popen(["xdg-open", dest_dir])
+        msg = "Abriendo Carpeta..."
+        logger.info("[INFO] %s", msg)
+        print(f"[INFO] {msg}")
+        return {"success": True, "message": msg}
+    except Exception as e:
+        msg = f"No se pudo abrir la carpeta: {e}"
         logger.error("[ERROR] %s", msg)
         print(f"[ERROR] {msg}")
         return {"success": False, "message": msg}

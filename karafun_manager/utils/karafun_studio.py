@@ -163,7 +163,7 @@ def _extract_files(f, entries, data_base, out_dir):
         extracted.append(out_path)
     return extracted
 
-def recrear_kfn(key:str, archivos: list[str], audio:str, fondo: str) -> dict:
+def recrear_kfn(key:str, archivos: list[str], audio:str, fondo: str, opc: int) -> dict:
     try:
         song_dir = os.path.join(config.get_path_main(), key)
         extract_dir = os.path.join(song_dir, 'kfn_temp')
@@ -195,9 +195,11 @@ def recrear_kfn(key:str, archivos: list[str], audio:str, fondo: str) -> dict:
         result = kfun.genera_archivo_kfun()
         if result[0] == "0":
             # Eliminar carpeta temporal.
+            if opc == 1:
+                kfn_path = os.path.join(song_dir, 'kara_fun.kfn')
+                open_karafun(kfn_path)
+                return {"success":True, "message":result[1]}
             shutil.rmtree(extract_dir)
-            kfn_path = os.path.join(song_dir, 'kara_fun.kfn')
-            open_karafun(kfn_path)
             return {"success":True, "message":result[1]}
         else:
             return {"success":False, "message":result[1]}
