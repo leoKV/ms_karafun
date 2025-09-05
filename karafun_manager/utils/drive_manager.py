@@ -10,6 +10,7 @@ from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
 from google.oauth2 import service_account
 from karafun_manager.repositories.cancion_repository import CancionRepository
 from karafun_manager.utils.karafun_studio import open_karafun
+from karafun_manager.utils.print import _log_print
 from concurrent.futures import ThreadPoolExecutor
 from ms_karafun import config
 import logging
@@ -36,17 +37,17 @@ def download_file(file, dest_dir):
         if os.path.exists(local_path):
             local_modified = datetime.fromtimestamp(os.path.getmtime(local_path), tz=timezone.utc)
             if local_modified > drive_modified:
-                logger.info("[INFO] El archivo local %s es más reciente. Subiendo a Drive...", file_name)
-                print(f"[INFO] El archivo local {file_name} es más reciente. Subiendo a Drive...")
+                msg = _log_print("INFO",f"El archivo local {file_name} es más reciente. Subiendo a Drive...")
+                logger.info(msg)
                 upload_file(service, local_path, file_id)
                 return
             elif local_modified == drive_modified:
-                logger.info("[INFO] El archivo %s ya está actualizado.", file_name)
-                print(f"[INFO] El archivo {file_name} ya está actualizado.")
+                msg = _log_print("INFO",f"El archivo {file_name} ya está actualizado.")
+                logger.info(msg)
                 return
             else:
-                logger.info("[INFO] El archivo en Drive %s es más reciente. Reemplazando...", file_name)
-                print(f"[INFO] El archivo en Drive {file_name} es más reciente. Reemplazando...")
+                msg = _log_print("INFO",f"El archivo en Drive {file_name} es más reciente. Reemplazando...")
+                logger.info(msg)
         request = service.files().get_media(fileId=file_id) # pylint: disable=no-member
         fh = io.FileIO(local_path, 'wb')
         downloader = MediaIoBaseDownload(fh, request)
@@ -54,26 +55,28 @@ def download_file(file, dest_dir):
         while not done:
             done = downloader.next_chunk()
         os.utime(local_path, (drive_modified.timestamp(), drive_modified.timestamp()))
-        logger.info("[INFO] Archivo %s descargado en: %s", file_name, local_path)
-        print(f"[INFO] Archivo {file_name} descargado en: {local_path}")
+        msg = _log_print("INFO",f"Archivo {file_name} descargado en: {local_path}")
+        logger.info(msg)
     except Exception as e:
-        logger.error("[Error] Error al descargar %s: %s", file['name'], str(e))
-        print(f"[ERROR] Error al descargar {file['name']}: {e}")
-        
+        msg = _log_print("ERROR",f"Error al descargar {file['name']}: {e}")
+        logger.error(msg)
+
 def download_all_files(song_key: str) -> dict:
     try:
         service = authenticate_drive()
         # Paso 1: Obtener ID del folder padre (kia_songs)
         parent_folder_id = CancionRepository().get_parent_folder()
         if not parent_folder_id:
-            print("[ERROR] No se pudo obtener la carpeta principal 'kia_songs'.")
+            msg = _log_print("ERROR","No se pudo obtener la carpeta principal 'kia_songs'.")
+            logger.error(msg)
             return {"success": False, "message": "No se pudo obtener la carpeta principal 'kia_songs'."}
         # Paso 2: Buscar la carpeta cuyo nombre sea igual a la key
         query = f"'{parent_folder_id}' in parents and name = '{song_key}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
         response = service.files().list(q=query, spaces='drive', fields='files(id, name)').execute()  # pylint: disable=no-member
         folders = response.get('files', [])
         if not folders:
-            print(f"[ERROR] No se encontró la carpeta con key {song_key}")
+            msg = _log_print("ERROR",f"No se encontró la carpeta con key {song_key}")
+            logger.error(msg)
             return {"success": False, "message": f"No se encontró la carpeta con key '{song_key}' en Google Drive."}
         folder_id = folders[0]['id']
         # Paso 3: Obtener todos los archivos dentro de la carpeta
@@ -81,7 +84,8 @@ def download_all_files(song_key: str) -> dict:
         response = service.files().list(q=query, spaces='drive', fields='files(id, name, modifiedTime)').execute() # pylint: disable=no-member
         files = response.get('files', [])
         if not files:
-            print(f"[WARNING] No se encontraron archivos en la carpeta {song_key}")
+            msg = _log_print("WARNING",f"No se encontraron archivos en la carpeta {song_key}")
+            logger.warning(msg)
             return {"success": False, "message": f"No hay archivos en la carpeta con key '{song_key}'."}
         # Paso 4: Crear directorio local
         dest_dir = os.path.join(config.get_path_main(), song_key)
@@ -92,7 +96,8 @@ def download_all_files(song_key: str) -> dict:
                 executor.submit(download_file, file, dest_dir)
         return {"success": True, "message": f"Archivos descargados para la key '{song_key}'."}
     except HttpError as error:
-        print(f"[ERROR] Error al acceder a Google Drive: {error}")
+        msg = _log_print("ERROR",f"Error al acceder a Google Drive: {error}")
+        logger.error(msg)
         return {"success": False, "message": "Error de conexión con Google Drive."}
     
 def search_kfn(song_key: str, filename: str = "kara_fun.kfn") -> dict:
@@ -100,26 +105,26 @@ def search_kfn(song_key: str, filename: str = "kara_fun.kfn") -> dict:
         dest_dir = os.path.join(config.get_path_main(), song_key)
         local_path = os.path.join(dest_dir, filename)
         if os.path.exists(local_path):
-            logger.info("[INFO] Archivo local %s encontrado.", filename)
-            print(f"[INFO] Archivo local {filename} encontrado.")
+            msg = _log_print("INFO",f"Archivo local {filename} encontrado.")
+            logger.info(msg)
             return open_karafun(local_path)
-        logger.error("[ERROR] No se encontró el archivo %s en la carpeta local.", filename)
-        print(f"[ERROR] No se encontró el archivo {filename} en la carpeta local.")
+        msg = _log_print("ERROR",f"No se encontró el archivo {filename} en la carpeta local.")
+        logger.error(msg)
         return {"success": False, "message": "No hay KFN."}
     except Exception as e:
-        logger.error("[ERROR] Error al abrir el archivo KFN: %s", str(e))
-        print(f"[ERROR] Error al abrir el archivo KFN: {str(e)}")
+        msg = _log_print("ERROR",f"Error al abrir el archivo KFN: {str(e)}")
+        logger.error(msg)
         return {"success": False, "message": str(e)}
     
 def upload_file(service, local_path, file_id):
     try:
         media = MediaFileUpload(local_path, resumable=True)
         service.files().update(fileId=file_id, media_body=media).execute()
-        logger.info("[INFO] Archivo %s actualizado en Google Drive.", os.path.basename(local_path))
-        print(f"[INFO] Archivo {os.path.basename(local_path)} actualizado en Google Drive.")
+        msg = _log_print("INFO",f"Archivo {os.path.basename(local_path)} actualizado en Google Drive.")
+        logger.info(msg)
     except Exception as e:
-        logger.error("[ERROR] Error al subir %s: %s", os.path.basename(local_path), str(e))
-        print(f"[ERROR] Error al subir {os.path.basename(local_path)}: {str(e)}")
+        msg = _log_print("ERROR",f"Error al subir {os.path.basename(local_path)}: {str(e)}")
+        logger.error(msg)
 
 def upload_kfn(song_key: str) -> dict:
     try:
@@ -156,9 +161,8 @@ def upload_kfn(song_key: str) -> dict:
             }
             media = MediaFileUpload(local_path, resumable=True)
             service.files().create(body=file_metadata, media_body=media, fields='id').execute() # pylint: disable=no-member
-            msg = f"[INFO] Archivo kara_fun.kfn subido a la carpeta {song_key}"
+            msg = _log_print("INFO",f"Archivo kara_fun.kfn subido a la carpeta {song_key}")
             logger.info(msg)
-            print(msg)
         return {"success": True, "message": f"Archivo kara_fun.kfn subido para la key '{song_key}'."}
     except HttpError as error:
         return {"success": False, "message": f"Error de conexión con Google Drive: {error}"}
@@ -191,17 +195,15 @@ def download_k(song_key: str, drive_id:str, tipo:int) -> dict:
         downloader = MediaIoBaseDownload(fh, request)
         while not done:
             done = downloader.next_chunk()
-        msg = f"[INFO] Archivo Descargado en {final_path}"
+        msg = _log_print("INFO",f"Archivo Descargado en {final_path}")
         logger.info(msg)
-        print(msg)
         # 3. Abrir el archivo en el reproductor predeterminado
         abrir_video(final_path)
         msg = "Archivo Descargado."
         return {"success": True, "message": msg}
     except Exception as e:
-        msg = f"[ERROR] Error al descargar Karaoke: {str(e)}"
+        msg = _log_print("ERROR",f"Error al descargar Karaoke: {str(e)}")
         logger.error(msg)
-        print(msg)
         return {"success": False, "message": str(e)}
     
 def abrir_video(final_path):
@@ -213,11 +215,52 @@ def abrir_video(final_path):
             subprocess.run(["open", final_path])
         else:
             subprocess.run(["xdg-open", final_path])
-        msg = f"[INFO] Reproduciendo: {final_path}"
+        msg = _log_print("INFO",f"Reproduciendo: {final_path}")
         logger.info(msg)
-        print(msg)
     except Exception as e:
-        print(f"[ERROR] No se pudo reproducir el video: {e}")
+        msg = _log_print("ERROR",f"No se pudo reproducir el video: {e}")
+        logger.error(msg)
+
+def verificar_audio(song_key: str, tipo_proceso:int) -> dict:
+    try:
+        service = authenticate_drive()
+        # Paso 1: obtener carpeta padre (kia_songs)
+        parent_folder_id = CancionRepository().get_parent_folder()
+        if not parent_folder_id:
+            return {"success": False, "message": "No se pudo obtener la carpeta principal 'kia_songs'."}
+        # Paso 2: buscar carpeta de la canción
+        query = f"'{parent_folder_id}' in parents and name = '{song_key}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
+        response = service.files().list(q=query, spaces='drive', fields='files(id, name)').execute() # pylint: disable=no-member
+        folders = response.get('files', [])
+        if not folders:
+            return {"success": False, "message": f"No se encontró la carpeta con key '{song_key}' en Google Drive."}
+        folder_id = folders[0]['id']
+        # Paso 3: definir archivos esperados.
+        expected_files = []
+        if tipo_proceso == 6:
+            expected_files = ["sin_voz.mp3", "no_vocals.mp3"]
+        elif tipo_proceso == 8:
+            expected_files = ["con_voz.mp3", "main.mp3"]
+        # Paso 4: listar archivos dentro de la carpeta
+        query_files = f"'{folder_id}' in parents and mimeType != 'application/vnd.google-apps.folder' and trashed = false"
+        files_response = service.files().list(q=query_files, spaces='drive', fields='files(id, name)').execute() # pylint: disable=no-member
+        files = files_response.get("files", [])
+        found_files = [f["name"] for f in files]
+        # Paso 5: verificar si alguno de los archivos existe.
+        matched_files = [f for f in expected_files if f in found_files]
+        if matched_files:
+            return {"success": True, "message": f"Se encontraron los archivos requeridos en: {song_key}",
+            }
+        else:
+            return {
+                "success": False,
+                "message": f"No se encontraron archivos clave en: {song_key}",
+                "expected": expected_files
+            }
+    except HttpError as error:
+        return {"success": False, "message": f"Error de conexión con Google Drive: {error}"}
+    except Exception as e:
+        return {"success": False, "message": str(e)}
 
 # PRUEBAS
 def upload_file_to_folder(file_path: str, folder_id: str, filename: str = None) -> str:
@@ -233,8 +276,10 @@ def upload_file_to_folder(file_path: str, folder_id: str, filename: str = None) 
             media_body=media,
             fields="id"
         ).execute()
-        print(f"[INFO] Archivo subido a Google Drive: {file['id']}")
+        msg = _log_print("INFO",f"Archivo subido a Google Drive: {file['id']}")
+        logger.info(msg)
         return file["id"]
     except HttpError as error:
-        print(f"[ERROR] Error al subir archivo a Google Drive: {error}")
+        msg = _log_print("ERROR",f"Error al subir archivo a Google Drive: {error}")
+        logger.error(msg)
         return ""

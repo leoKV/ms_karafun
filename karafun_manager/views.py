@@ -9,9 +9,10 @@ import json
 from ms_karafun import config
 from concurrent.futures import ThreadPoolExecutor
 from karafun_manager.repositories.cancion_repository import CancionRepository
-from karafun_manager.utils.drive_manager import search_kfn, download_all_files, upload_kfn, download_k
+from karafun_manager.utils.drive_manager import search_kfn, download_all_files, upload_kfn, download_k, verificar_audio
 from karafun_manager.utils.audacity import open_audacity, open_carpeta
-from karafun_manager.utils.karafun_studio import manipular_kfn, recrear_kfn
+from karafun_manager.utils.karafun_studio import manipular_kfn, recrear_kfn, verificar_kfn
+from karafun_manager.utils.print import _log_print
 from karafun_manager.models.Cancion import Cancion
 from karafun_manager.services.KaraokeFUNForm import KaraokeFunForm
 import logging
@@ -40,7 +41,8 @@ def sync_drive(request):
                     resultados.append(future.result())
             return JsonResponse({'success': True, 'message': '¡Archivos Sincronizados Correctamente!'})
         except Exception as e:
-            print(f"[EXCEPTION] {e}")
+            msg = _log_print("ERROR",f"{e}")
+            logger.error(msg)
             return JsonResponse({'success': False, 'message': str(e)})
     return JsonResponse({'success': False, 'message': 'Método no permitido'})
 
@@ -63,7 +65,8 @@ def subir_karafun(request):
                     resultados.append(future.result())
             return JsonResponse({'success': True, 'message': '¡Archivo(s) KFN Subido(s) a Google Drive!'})
         except Exception as e:
-            print(f"[EXCEPTION] {e}")
+            msg = _log_print("ERROR",f"{e}")
+            logger.error(msg)
             return JsonResponse({'success': False, 'message': str(e)})
     return JsonResponse({'success': False, 'message': 'Método no permitido'})
 
@@ -79,7 +82,8 @@ def abrir_karafun(request):
                 return JsonResponse({"success": False, "message": "No hay KFN."})
             return JsonResponse(result)
         except Exception as e:
-            print(f"[EXCEPTION] {e}")
+            msg = _log_print("ERROR",f"{e}")
+            logger.error(msg)
             return JsonResponse({'success': False, 'message': str(e)})
     return JsonResponse({'success': False, 'message': 'Método no permitido'})
 
@@ -100,13 +104,13 @@ def crear_karafun(request):
             song_dir = os.path.join(config.get_path_main(), key)
             mp3_path = os.path.join(song_dir, 'main.mp3')
             if not mp3_path:
-                logger.error("[ERROR] El archivo main.mp3 es obligatorio.")
-                print("[ERROR] El archivo main.mp3 es obligatorio.")
+                msg = _log_print("ERROR","El archivo main.mp3 es obligatorio.")
+                logger.error(msg)
                 return JsonResponse({'success': False, 'message': 'El archivo main.mp3 es obligatorio.'})
             datos = repo.get_song_ini(cancion_id)
             if not datos:
-                logger.error("[ERROR] No se pudieron obtener datos de Songini.")
-                print("[ERROR] No se pudieron obtener datos de Songini.")
+                msg = _log_print("ERROR","No se pudieron obtener datos de Songini.")
+                logger.error(msg)
                 return JsonResponse({'success': False, 'message': 'No se pudieron obtener datos de Songini.'})
             song_ini = datos.get("songini") or "" 
             letra = datos.get("letra") or ""
@@ -123,11 +127,15 @@ def crear_karafun(request):
                 path_imagen_cliente=path_imagen_cliente
             )
             if not verificar_recursos():
+                msg = _log_print("WARNING","No se pudieron verificar los recursos.")
+                logger.info(msg)
                 return JsonResponse({'success': False, 'message': 'No se pudieron verificar los recursos.'})
             # Crear Karafun.
             kfun = KaraokeFunForm(cancion)
             result = kfun.genera_archivo_kfun()
             if result[0] == "0":  # Éxito
+                # Actualizar porcentaje a 40%
+                repo.update_porcentaje_avance(cancion_id=cancion_id, porcentaje=40)
                 search_kfn(key)
                 return JsonResponse({
                     'success': True,
@@ -136,7 +144,8 @@ def crear_karafun(request):
             else:  # Error en la generación
                 return JsonResponse({'success': False, 'message': result[1]})
         except Exception as e:
-            print(f"[EXCEPTION] {e}")
+            msg = _log_print("ERROR",f"{e}")
+            logger.error(msg)
             return JsonResponse({'success': False, 'message': str(e)})
     return JsonResponse({'success': False, 'message': 'Método no permitido'})
 
@@ -150,24 +159,20 @@ def verificar_recursos():
         path_d = Path(config.get_path_img_fondo())
         path_destino = path_d.parent
         if not os.path.exists(path_zip):
-            msg = f"[ERROR] No se encontró el archivo: {path_zip}"
+            msg = _log_print("ERROR",f"No se encontró el archivo: {path_zip}")
             logger.error(msg)
-            print(msg)
             return False
-        msg = f"[INFO] Extrayendo {path_zip} a {path_destino}..."
+        msg = _log_print("INFO",f"Extrayendo {path_zip} a {path_destino}...")
         logger.info(msg)
-        print(msg)
         with zipfile.ZipFile(path_zip, 'r') as zip_ref:
             zip_ref.extractall(path_destino)
         shutil.rmtree(path_resources)
-        msg = "[INFO] Extracción completada y archivo ZIP eliminado."
+        msg = _log_print("INFO","Extracción completada y archivo ZIP eliminado.")
         logger.info(msg)
-        print(msg)
         return True
     except Exception as e:
-        msg = f"[ERROR] Fallo al verificar/extraer recursos: {e}"
+        msg = _log_print("ERROR",f"Fallo al verificar/extraer recursos: {e}")
         logger.error(msg)
-        print(msg)
         return False
 
 @csrf_exempt
@@ -181,7 +186,8 @@ def download_karaoke(request):
             result = download_k(key, drive_id, tipo)
             return JsonResponse(result)
         except Exception as e:
-            print(f"[EXCEPTION] {e}")
+            msg = _log_print("ERROR",f"{e}")
+            logger.error(msg)
             return JsonResponse({'success': False, 'message': str(e)})
     return JsonResponse({'success': False, 'message': 'Método no permitido'})
 
@@ -201,14 +207,17 @@ def delete_karaoke(request):
             dest_dir = os.path.join(key_dir, karaoke_dir)
             if os.path.exists(dest_dir):
                 shutil.rmtree(dest_dir)
-                msg = "Archivo Eliminado Localmente."
+                msg = _log_print("INFO",f"Carpeta Eliminada: {dest_dir}")
+                logger.info(msg)
                 result = {"success": True, "message": msg}
             else:
-                msg = "La carpeta no existe."
+                msg = _log_print("WARNING",f"La carpeta no existe: {dest_dir}")
+                logger.warning(msg)
                 result = {"success": False, "message": msg}
             return JsonResponse(result)
         except Exception as e:
-            print(f"[EXCEPTION] {e}")
+            msg = _log_print("ERROR",f"{e}")
+            logger.error(msg)
             return JsonResponse({'success': False, 'message': str(e)})
     return JsonResponse({'success': False, 'message': 'Método no permitido'})
 
@@ -221,7 +230,8 @@ def abrir_audacity(request):
             result = open_audacity(key)
             return JsonResponse(result)
         except Exception as e:
-            print(f"[EXCEPTION] {e}")
+            msg = _log_print("ERROR",f"{e}")
+            logger.error(msg)
             return JsonResponse({'success': False, 'message': str(e)})
     return JsonResponse({'success': False, 'message': 'Método no permitido'})
 
@@ -234,10 +244,10 @@ def manipular_karafun(request):
             result = manipular_kfn(key)
             return JsonResponse(result)
         except Exception as e:
-            print(f"[EXCEPTION] {e}")
+            msg = _log_print("ERROR",f"{e}")
+            logger.error(msg)
             return JsonResponse({'success': False, 'message': str(e)})
     return JsonResponse({'success': False, 'message': 'Método no permitido'})
-
 
 @csrf_exempt
 def recrear_karafun(request):
@@ -254,10 +264,10 @@ def recrear_karafun(request):
             result = recrear_kfn(key, archivos, audio, fondo, opc)
             return JsonResponse(result)
         except Exception as e:
-            print(f"[EXCEPTION] {e}")
+            msg = _log_print("ERROR",f"{e}")
+            logger.error(msg)
             return JsonResponse({'success': False, 'message': str(e)})
     return JsonResponse({'success': False, 'message': 'Método no permitido'})
-
 
 @csrf_exempt
 def abrir_carpeta(request):
@@ -268,6 +278,101 @@ def abrir_carpeta(request):
             result = open_carpeta(key)
             return JsonResponse(result)
         except Exception as e:
-            print(f"[EXCEPTION] {e}")
+            msg = _log_print("ERROR",f"{e}")
+            logger.error(msg)
+            return JsonResponse({'success': False, 'message': str(e)})
+    return JsonResponse({'success': False, 'message': 'Método no permitido'})
+
+@csrf_exempt
+def delete_carpeta(request):
+    if request.method == 'POST':
+        try:
+            body = json.loads(request.body)
+            keys = body.get('keys', [])
+            if not isinstance(keys, list):
+                return JsonResponse({'success': False, 'message': 'Formato inválido: se esperaba una lista de keys'})
+            dir_path = Path(config.get_path_main())
+            cantidad = len(keys)
+            def worker(key):
+                carpeta_path = dir_path / key
+                if carpeta_path.exists() and carpeta_path.is_dir():
+                    try:
+                        shutil.rmtree(carpeta_path)
+                    except Exception as e:
+                        msg = _log_print("ERROR",f"key: {key} Error al eliminar: {str(e)}")
+                        logger.error(msg)
+                else:
+                    msg = _log_print("WARNING",f"key: {key}, No encontrada.")
+                    logger.warning(msg)
+            with ThreadPoolExecutor(max_workers=max(cantidad, 1)) as executor:
+                for key in keys:
+                    executor.submit(worker, key)
+            return JsonResponse({'success': True, 'message': '¡Archivo(s) Locales eliminados!'})
+        except Exception as e:
+            msg = _log_print("ERROR",f"{e}")
+            logger.error(msg)
+            return JsonResponse({'success': False, 'message': str(e)})
+    return JsonResponse({'success': False, 'message': 'Método no permitido'})
+
+@csrf_exempt
+def comprobar_audio(request):
+    if request.method == 'POST':
+        try:
+            body = json.loads(request.body)
+            keys = body.get('keys', [])
+            tipo_proceso = body.get('tipo_proceso')
+            if not isinstance(keys, list):
+                return JsonResponse({'success': False, 'message': 'Formato inválido: se esperaba una lista de keys'})
+            cantidad = len(keys)
+            resultados = []
+            def worker(key):
+                result = verificar_audio(key, tipo_proceso)
+                return {'key': key, 'resultado': result}
+            with ThreadPoolExecutor(max_workers= cantidad) as executor:
+                futures = [executor.submit(worker, key) for key in keys]
+                for future in futures:
+                    resultados.append(future.result())
+            return JsonResponse({'success': True, 'message': '¡Audios Comprobados Correctamente!','resultados':resultados})
+        except Exception as e:
+            msg = _log_print("ERROR",f"{e}")
+            logger.error(msg)
+            return JsonResponse({'success': False, 'message': str(e)})
+    return JsonResponse({'success': False, 'message': 'Método no permitido'})
+
+@csrf_exempt
+def comprobar_kfn(request):
+    if request.method == 'POST':
+        try:
+            body = json.loads(request.body)
+            canciones = body.get('data', [])
+            tipo_proceso = body.get('tipo_proceso')
+            if not isinstance(canciones, list):
+                return JsonResponse({'success': False, 'message': 'Formato inválido: se esperaba una lista de canciones'})
+            cantidad = len(canciones)
+            resultados = []
+            def worker(cancion):
+                key = cancion['key']
+                result = verificar_kfn(key, tipo_proceso)
+                return {**cancion, "resultado": result}
+            with ThreadPoolExecutor(max_workers= cantidad) as executor:
+                futures = [executor.submit(worker, c) for c in canciones]
+                for future in futures:
+                    resultados.append(future.result())
+            # Filtrar solo canciones completas.
+            canciones_validas = [
+                {k: v for k, v in r.items() if k != "resultado"}
+                for r in resultados if r["resultado"]["success"]
+            ]
+            msg = _log_print("INFO","Comprobación completada")
+            logger.info(msg)
+            return JsonResponse({
+                'success': True,
+                'message': 'Validación completada',
+                'Cantidad': len(canciones_validas),
+                'data': canciones_validas
+            })
+        except Exception as e:
+            msg = _log_print("ERROR",f"{e}")
+            logger.error(msg)
             return JsonResponse({'success': False, 'message': str(e)})
     return JsonResponse({'success': False, 'message': 'Método no permitido'})

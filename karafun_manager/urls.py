@@ -13,4 +13,7 @@ urlpatterns = [
     path('manipularKarafun/', views.manipular_karafun),
     path('recrearKarafun/', views.recrear_karafun),
     path('openCarpeta/', views.abrir_carpeta),
+    path('deleteCarpeta/', views.delete_carpeta),
+    path('comprobarAudio/', views.comprobar_audio),
+    path('validarKFN/', views.comprobar_kfn)
 ]

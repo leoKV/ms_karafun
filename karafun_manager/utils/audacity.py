@@ -2,6 +2,7 @@ import os
 import platform
 import subprocess
 from ms_karafun import config
+from karafun_manager.utils.print import _log_print
 import logging
 from karafun_manager.utils import logs
 logger = logging.getLogger(__name__)
@@ -12,14 +13,12 @@ def open_audacity(key: str) -> dict:
     vocals = os.path.join(dest_dir, 'vocals.mp3')
     no_vocals = os.path.join(dest_dir, 'no_vocals.mp3')
     if not os.path.exists(audacity_exe):
-        msg = "Audacity no está instalado o la ruta es incorrecta."
-        logger.error("[ERROR] %s", msg)
-        print(f"[ERROR] {msg}")
+        msg = _log_print("ERROR","Audacity no está instalado o la ruta es incorrecta.")
+        logger.error(msg)
         return {"success": False, "message": msg}
     if not os.path.exists(vocals) or not os.path.exists(no_vocals):
-        msg = "No se encontraron archivos de audio."
-        logger.error("[ERROR] %s", msg)
-        print(f"[ERROR] {msg}")
+        msg = _log_print("ERROR","No se encontraron archivos de audio.")
+        logger.error(msg)
         return {"success": False, "message": msg}
     try:
         # Crear archivo .lof
@@ -29,24 +28,19 @@ def open_audacity(key: str) -> dict:
             lof.write(f'file "{no_vocals}"\n')
         # Ejecutar Audacity con el .lof
         subprocess.Popen([audacity_exe, lof_path], shell=False)
-        msg = "Abriendo Audacity..."
-        logger.info("[INFO] %s", msg)
-        print(f"[INFO] {msg}")
+        msg = _log_print("INFO","Abriendo Audacity...")
+        logger.info(msg)
         return {"success": True, "message": msg}
     except Exception as e:
-        msg = f"No se pudo lanzar Audacity: {e}"
-        logger.error("[ERROR] %s", msg)
-        print(f"[ERROR] {msg}")
+        msg = _log_print("ERROR",f"No se pudo lanzar Audacity: {e}")
+        logger.error(msg)
         return {"success": False, "message": msg}
-    
-
 
 def open_carpeta(key: str) -> dict:
     dest_dir = os.path.join(config.get_path_main(), key)
     if not os.path.exists(dest_dir):
-        msg = f"No se encontro la carpeta: {dest_dir}"
-        logger.error("[ERROR] %s", msg)
-        print(f"[ERROR] {msg}")
+        msg = _log_print("ERROR",f"No se encontro la carpeta: {dest_dir}")
+        logger.error(msg)
         return {"success": False, "message": msg}
     try:
         system = platform.system()
@@ -56,12 +50,10 @@ def open_carpeta(key: str) -> dict:
             subprocess.Popen(["open", dest_dir])
         else:  # Linux (GNOME, KDE, XFCE, etc.)
             subprocess.Popen(["xdg-open", dest_dir])
-        msg = "Abriendo Carpeta..."
-        logger.info("[INFO] %s", msg)
-        print(f"[INFO] {msg}")
+        msg = _log_print("INFO","Abriendo Carpeta...")
+        logger.info(msg)
         return {"success": True, "message": msg}
     except Exception as e:
-        msg = f"No se pudo abrir la carpeta: {e}"
-        logger.error("[ERROR] %s", msg)
-        print(f"[ERROR] {msg}")
+        msg = _log_print("ERROR",f"No se pudo abrir la carpeta: {e}")
+        logger.error(msg)
         return {"success": False, "message": msg}

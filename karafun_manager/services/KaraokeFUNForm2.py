@@ -5,6 +5,7 @@ from typing import List
 from karafun_manager.models.ArchivoKFUN import ArchivoKFUN
 from karafun_manager.models.FormatKFUN import FormatKFUN
 from karafun_manager.models.TagKFUN import TagKFUN
+from karafun_manager.utils.print import _log_print
 from ms_karafun import config
 import logging
 from karafun_manager.utils import logs
@@ -117,7 +118,8 @@ class KaraokeFunForm2:
             with open(path_url, 'rb') as f:
                 bytes = f.read()
         except IOError as e:
-            logger.error("[ERROR] No se pudo leer el archivo en _get_file(): %s", str(e))
+            msg = _log_print("ERROR",f"No se pudo leer el archivo en KaraokeFunForm2: {str(e)}")
+            logger.error(msg)
             bytes = b''
         filename = Path(path_url).name
         archivo = ArchivoKFUN(

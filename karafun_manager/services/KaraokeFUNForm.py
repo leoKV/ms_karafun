@@ -9,6 +9,7 @@ from karafun_manager.models.FormatKFUN import FormatKFUN
 from karafun_manager.models.General import General
 from karafun_manager.models.TagKFUN import TagKFUN
 from ms_karafun import config
+from karafun_manager.utils.print import _log_print
 import logging
 from karafun_manager.utils import logs
 logger = logging.getLogger(__name__)
@@ -140,7 +141,8 @@ class KaraokeFunForm:
             with open(path_url, 'rb') as f:
                 bytes = f.read()
         except IOError as e:
-            logger.error("[ERROR] No se pudo leer el archivo en _get_file(): %s", str(e))
+            msg = _log_print("ERROR",f"No se pudo leer el archivo en KaraokeFunForm: {str(e)}")
+            logger.error(msg)
             bytes = b''
         filename = Path(path_url).name
         archivo = ArchivoKFUN(

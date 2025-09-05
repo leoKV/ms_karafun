@@ -2,8 +2,10 @@ import os
 import shutil
 import subprocess
 import struct
+from karafun_manager.repositories.cancion_repository import CancionRepository
 from karafun_manager.services.KaraokeFUNForm2 import KaraokeFunForm2
 from ms_karafun import config
+from karafun_manager.utils.print import _log_print
 import logging
 from karafun_manager.utils import logs
 logger = logging.getLogger(__name__)
@@ -11,20 +13,17 @@ logger = logging.getLogger(__name__)
 def open_karafun(file_path: str) -> dict:
     karafun_exe = config.get_path_karafun()
     if not os.path.exists(karafun_exe):
-        msg = "KaraFun Studio no está instalado o la ruta es incorrecta."
-        logger.error("[ERROR] %s", msg)
-        print(f"[ERROR] {msg}")
+        msg = _log_print("ERROR","KaraFun Studio no está instalado o la ruta es incorrecta.")
+        logger.error(msg)
         return {"success": False, "message": msg}
     try:
         subprocess.Popen([karafun_exe, file_path], shell=False)
-        msg = "Abriendo Archivo Karafun."
-        logger.info("[INFO] %s", msg)
-        print(f"[INFO] {msg}")
+        msg = _log_print("INFO","Abriendo Archivo Karafun.")
+        logger.info(msg)
         return {"success": True, "message": msg}
     except Exception as e:
-        msg = f"No se pudo lanzar KaraFun Studio: {e}"
-        logger.error("[ERROR] %s", msg)
-        print(f"[ERROR] {msg}")
+        msg = _log_print("ERROR",f"No se pudo lanzar KaraFun Studio: {e}")
+        logger.error(msg)
         return {"success": False, "message": msg}
 
 def manipular_kfn(key: str) -> dict:
@@ -32,16 +31,14 @@ def manipular_kfn(key: str) -> dict:
         song_dir = os.path.join(config.get_path_main(), key)
         kfn_path = os.path.join(song_dir, 'kara_fun.kfn')
         if not os.path.isfile(kfn_path):
-            msg = "[ERROR] No se encontro el archivo KFN"
-            print(msg)
+            msg = _log_print("ERROR","No se encontro el archivo KFN")
             logger.error(msg)
             return {'success': False, 'message': msg}
         extract_dir = os.path.join(song_dir, 'kfn_temp')
         with open(kfn_path, 'rb') as f:
             # 1) Firma
             if _read_exact(f, 4) != b'KFNB':
-                msg = 'Archivo inválido: firma KFNB no encontrada.'
-                print(msg)
+                msg = _log_print("ERROR","Archivo inválido: firma KFNB no encontrada.")
                 logger.error(msg)
                 return {'success': False, 'message': msg}
             # 2) Tags - ENDH
@@ -76,8 +73,7 @@ def manipular_kfn(key: str) -> dict:
                     # Fondo actual (LibImage=archivo)
                     elif line.startswith("LibImage="):
                         selected_background = line.split("=", 1)[1].strip()
-        msg = 'KFN leído correctamente.'
-        print(msg)
+        msg = _log_print("INFO","KFN leído correctamente.")
         logger.error(msg)
         return {
             'success': True,
@@ -185,8 +181,7 @@ def recrear_kfn(key:str, archivos: list[str], audio:str, fondo: str, opc: int) -
             if os.path.exists(src):
                 shutil.copy2(src, dst)
             else:
-                msg = f"[WARNING] El archivo {f} no existe en {song_dir}"
-                print(msg)
+                msg = _log_print("WARNING",f"El archivo {f} no existe en {song_dir}")
                 logger.warning(msg)
         # 3. Actualizar Song.ini
         actualizar_song_ini(extract_dir, audio, fondo)
@@ -204,13 +199,11 @@ def recrear_kfn(key:str, archivos: list[str], audio:str, fondo: str, opc: int) -
         else:
             return {"success":False, "message":result[1]}
     except UnicodeDecodeError as e:
-        msg = f"Error de decodificación: {str(e)}"
-        print(msg)
+        msg =_log_print("ERROR",f"Error de decodificación: {str(e)}")
         logger.error(msg)
         return {'success': False, 'message': msg}
     except Exception as e:
-        msg = f"[ERROR] {str(e)}"
-        print(msg)
+        msg = _log_print("ERROR",f"{str(e)}")
         logger.error(msg)
         return {'success': False, 'message': msg}
     
@@ -234,10 +227,111 @@ def actualizar_song_ini(extract_dir: str, audio: str, fondo: str):
         # Guardar el archivo actualizado
         with open(ini_path, "w", encoding="utf-8") as f:
             f.writelines(nuevas_lineas)
-        msg = "[INFO] Song.ini actualizado."
-        print(msg)
+        msg = _log_print("INFO","Song.ini Actualizado.")
         logger.info(msg)
     except Exception as e:
-        msg = f"[ERROR] Error al actualizar Song.ini: {str(e)}"
-        print(msg)
+        msg = _log_print("ERROR",f"Error al actualizar Song.ini: {str(e)}")
         logger.error(msg)
+
+def verificar_kfn(key: str, tipo_proceso:int) -> dict:
+    extract_dir = None
+    try:
+        song_dir = os.path.join(config.get_path_main(), key)
+        kfn_path = os.path.join(song_dir, 'kara_fun.kfn')
+        if not os.path.isdir(song_dir):
+            return {"success": False, "message": f"No se encontró la carpeta local para la key: {key}"}
+        if not os.path.isfile(kfn_path):
+            return {"success": False, "message": f"No se encontró el archivo local kara_fun.kfn para la key: {key}"}
+        extract_dir = os.path.join(song_dir, 'kfn_temp_2')
+        with open(kfn_path, 'rb') as f:
+            # 1) Firma.
+            if _read_exact(f, 4) != b'KFNB':
+                msg = 'Archivo inválido: firma KFNB no encontrada.'
+                print(msg)
+                logger.error(msg)
+                return {'success': False, 'message': msg}
+            # 2) Tags - ENDH.
+            _read_tag_block(f)
+            # 3) Tabla de archivos.
+            entries, data_base = _read_files_table(f)
+            # 4) Extraer archivos.
+            archivos_extraidos = _extract_files(f, entries, data_base, extract_dir)
+            # 5) Lista de archivos del KFN.
+            archivos_kfn = [os.path.basename(p) for p in archivos_extraidos]
+            # 6) Validar Digitación.
+            song_ini = os.path.join(extract_dir, "Song.ini")
+            if not os.path.isfile(song_ini):
+                return {"success": False, "message": "No se encontró Song.ini en el KFN extraído."}
+            with open(song_ini, "r", encoding="utf-8", errors="ignore") as song_ini_file:
+                song_ini_content = song_ini_file.read()
+            if not validar_digitacion(song_ini_content, key):
+                return {"success": False, "message": "La digitación no cumple con el mínimo requerido."}
+            # 7) Validar audios según el tipo de proceso.
+            if tipo_proceso == 6:
+                expected_files = ["sin_voz.mp3", "no_vocals.mp3"]
+            elif tipo_proceso == 8:
+                expected_files = ["con_voz.mp3", "main.mp3"]
+            else:
+                expected_files = []
+            # Debe existir al menos uno de los audios
+            if not any(archivo in archivos_kfn for archivo in expected_files):
+                return {"success": False, "message": f"No se encontraron los audios requeridos ({expected_files}) en el KFN."}
+        return {"success": True, "message": key}
+    except UnicodeDecodeError as e:
+        msg = _log_print("ERROR",f"Error de decodificación: {str(e)}")
+        logger.error(msg)
+        return {'success': False, 'message': msg}
+    except Exception as e:
+        msg = _log_print("ERROR",f"{str(e)}")
+        logger.error(msg)
+        return {'success': False, 'message': msg}
+    finally:
+        if extract_dir and os.path.exists(extract_dir):
+            try:
+                shutil.rmtree(extract_dir)
+            except Exception as e:
+                msg = _log_print("ERROR",f"No se pudo eliminar el directorio temporal {extract_dir}: {str(e)}")
+                logger.error(msg)
+
+def validar_digitacion(song_ini, key):
+    try:
+        repo = CancionRepository()
+        porcentaje_minimo = repo.get_porcentaje_kfn()
+        # 1. Contar palabras en los Text
+        total_palabras = 0
+        for linea in song_ini.splitlines():
+            if linea.startswith("Text"):
+                _, texto = linea.split("=", 1)
+                palabras = [p for p in texto.strip().split() if p]
+                total_palabras += len(palabras)
+        # 2. Contar digitaciones en los Sync
+        total_sync = 0
+        for linea in song_ini.splitlines():
+            if linea.startswith("Sync"):
+                _, valores = linea.split("=", 1)
+                # Contar los números separados por coma
+                syncs = [s for s in valores.strip().split(",") if s]
+                total_sync += len(syncs)
+        # 3. Calcular el porcentaje
+        if total_palabras == 0:
+            msg = _log_print("WARNING",f"No se encontro la letra de la canción - {key}")
+            logger.warning(msg)
+            return False
+        if total_sync == 0:
+            msg = _log_print("WARNING",f"Aún no se ha realizado la digitación - {key}")
+            logger.warning(msg)
+            return False
+        porcentaje_real = (total_sync / total_palabras) * 100
+        # 4. Validar porcentaje mínimo requerido
+        if porcentaje_real >= porcentaje_minimo:
+            msg = _log_print("INFO",f"La digitación cumple con el mínimo requerido - {key}")
+            logger.info(msg)
+            return True
+        else:
+            msg = _log_print("WARNING",f"La digitación no cumple con el mínimo requerido - {key}")
+            logger.warning(msg)
+            return False
+    except Exception as e:
+        msg = _log_print("ERROR",f"No se pudo validar el porcentaje de la digitación - {key} : {str(e)}")
+        logger.error(msg)
+        return False
