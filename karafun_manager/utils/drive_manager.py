@@ -262,14 +262,67 @@ def verificar_audio(song_key: str, tipo_proceso:int) -> dict:
     except Exception as e:
         return {"success": False, "message": str(e)}
 
+def clean_drive(song_key: str, modo: int) -> bool:
+    try:
+        service = authenticate_drive()
+        # Paso 1: obtener carpeta padre (kia_songs)
+        parent_folder_id = CancionRepository().get_parent_folder()
+        if not parent_folder_id:
+            msg = _log_print("ERROR","No se pudo obtener la carpeta principal 'kia_songs'.")
+            logger.error(msg)
+            return False
+        # Paso 2: buscar carpeta de la canción
+        query = f"'{parent_folder_id}' in parents and name = '{song_key}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
+        response = service.files().list(q=query, spaces="drive", fields="files(id, name)").execute()  # pylint: disable=no-member
+        folders = response.get("files", [])
+        if not folders:
+            msg = _log_print("ERROR",f"No se encontró la carpeta en Drive: {song_key}")
+            logger.error(msg)
+            return False
+        folder_id = folders[0]["id"]
+        # Si modo = 2 Eliminar toda la carpeta en Drive.
+        if modo == 2:
+            try:
+                service.files().delete(fileId=folder_id).execute()  # pylint: disable=no-member
+                msg = _log_print("INFO",f"Carpeta '{song_key}' eliminada de Google Drive.")
+                logger.info(msg)
+                return True
+            except Exception as e:
+                msg = _log_print("ERROR",f"No se pudo eliminar la carpeta '{song_key}': {e}")
+                logger.error(msg)
+                return False
+        # Si modo = 1 → Eliminar archivos excepto kara_fun.kfn
+        query_files = (f"'{folder_id}' in parents and mimeType != 'application/vnd.google-apps.folder' and trashed = false")
+        files_response = service.files().list(q=query_files, spaces="drive", fields="files(id, name)").execute()  # pylint: disable=no-member
+        files = files_response.get("files", [])
+        if not files:
+            msg = _log_print("WARNING",f"No se encontraron archivos en la carpeta {song_key}")
+            logger.warning(msg)
+            return True
+        deleted, skipped = [], []
+        for f in files:
+            if f["name"] == "kara_fun.kfn":
+                skipped.append(f["name"])
+                continue
+            try:
+                service.files().delete(fileId=f["id"]).execute()  # pylint: disable=no-member
+                deleted.append(f["name"])
+                msg = _log_print("INFO",f"Archivo {f['name']} eliminado de la carpeta {song_key}")
+                logger.info(msg)
+            except Exception as e:
+                msg = _log_print("ERROR",f"No se pudo eliminar {f['name']}: {e}")
+                logger.error(msg)
+        return True
+    except Exception as e:
+        msg = _log_print("ERROR",f"Error al eliminar archivos en Google Drive: {str(e)}")
+        logger.error(msg)
+        return False
+
 # PRUEBAS
 def upload_file_to_folder(file_path: str, folder_id: str, filename: str = None) -> str:
     try:
         service = authenticate_drive()
-        file_metadata = {
-            "name": filename or os.path.basename(file_path),
-            "parents": [folder_id]
-        }
+        file_metadata = {"name": filename or os.path.basename(file_path),"parents": [folder_id]}
         media = MediaFileUpload(file_path, resumable=True)
         file = service.files().create( # pylint: disable=no-member
             body=file_metadata,

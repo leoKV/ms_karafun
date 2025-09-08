@@ -11,7 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 from karafun_manager.repositories.cancion_repository import CancionRepository
 from karafun_manager.utils.drive_manager import search_kfn, download_all_files, upload_kfn, download_k, verificar_audio
 from karafun_manager.utils.audacity import open_audacity, open_carpeta
-from karafun_manager.utils.karafun_studio import manipular_kfn, recrear_kfn, verificar_kfn
+from karafun_manager.utils.karafun_studio import manipular_kfn, recrear_kfn, verificar_kfn, finalizar_karaoke
 from karafun_manager.utils.print import _log_print
 from karafun_manager.models.Cancion import Cancion
 from karafun_manager.services.KaraokeFUNForm import KaraokeFunForm
@@ -371,6 +371,32 @@ def comprobar_kfn(request):
                 'Cantidad': len(canciones_validas),
                 'data': canciones_validas
             })
+        except Exception as e:
+            msg = _log_print("ERROR",f"{e}")
+            logger.error(msg)
+            return JsonResponse({'success': False, 'message': str(e)})
+    return JsonResponse({'success': False, 'message': 'Método no permitido'})
+
+
+
+@csrf_exempt
+def terminar_canciones(request):
+    if request.method == 'POST':
+        try:
+            body = json.loads(request.body)
+            keys = body.get('keys', [])
+            if not isinstance(keys, list):
+                return JsonResponse({'success': False, 'message': 'Formato inválido: se esperaba una lista de keys'})
+            cantidad = len(keys)
+            resultados = []
+            def worker(key):
+                result = finalizar_karaoke(key)
+                return {'key': key, 'resultado': result}
+            with ThreadPoolExecutor(max_workers= cantidad) as executor:
+                futures = [executor.submit(worker, key) for key in keys]
+                for future in futures:
+                    resultados.append(future.result())
+            return JsonResponse({'success': True, 'message': '¡Canciones Terminadas!','resultados':resultados})
         except Exception as e:
             msg = _log_print("ERROR",f"{e}")
             logger.error(msg)

@@ -15,5 +15,6 @@ urlpatterns = [
     path('openCarpeta/', views.abrir_carpeta),
     path('deleteCarpeta/', views.delete_carpeta),
     path('comprobarAudio/', views.comprobar_audio),
-    path('validarKFN/', views.comprobar_kfn)
+    path('validarKFN/', views.comprobar_kfn),
+    path('terminarCancion/', views.terminar_canciones)
 ]

@@ -35,6 +35,15 @@ class CancionRepository:
             logger.warning(msg)
             return None
     
+    def get_porcentaje_kfn(self):
+        with connections['default'].cursor()  as cursor:
+            cursor.execute("select * from public.sps_porcentaje_kfn()")
+            result = cursor.fetchone()
+        if result:
+            return result[0]
+        else:
+            return 80
+    
     def update_porcentaje_avance(self, cancion_id, porcentaje):
         with connections['default'].cursor() as cursor:
             cursor.execute(
@@ -44,11 +53,23 @@ class CancionRepository:
                 [ cancion_id, porcentaje]
             )
     
-    def get_porcentaje_kfn(self):
-        with connections['default'].cursor()  as cursor:
-            cursor.execute("select * from public.sps_porcentaje_kfn()")
+    def update_song_ini(self, key, song_ini):
+        with connections['default'].cursor() as cursor:
+            cursor.execute(
+                """
+                select * from public.spu_song_ini_2(%s, %s)
+                """,
+                [key, song_ini]
+            )
             result = cursor.fetchone()
-        if result:
-            return result[0]
-        else:
-            return 80
+        if result and len(result[0]) > 0:
+            retorno = result[0]
+            if retorno[0] == '0':
+                return True
+            msg = _log_print("WARNING", f"Error al actualizar song_ini: {retorno[1]}")
+            logger.warning(msg)
+            return False
+        msg = _log_print("WARNING", "La función spu_song_ini_2 no devolvió resultados.")
+        logger.warning(msg)
+        return False
+    
