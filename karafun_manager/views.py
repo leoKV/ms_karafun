@@ -10,7 +10,7 @@ from ms_karafun import config
 from concurrent.futures import ThreadPoolExecutor
 from karafun_manager.repositories.cancion_repository import CancionRepository
 from karafun_manager.utils.drive_manager import search_kfn, download_all_files, upload_kfn, download_k, verificar_audio
-from karafun_manager.utils.audacity import open_audacity, open_carpeta
+from karafun_manager.utils.audacity import open_audacity, open_carpeta, view_files
 from karafun_manager.utils.karafun_studio import manipular_kfn, recrear_kfn, verificar_kfn, finalizar_karaoke
 from karafun_manager.utils.print import _log_print
 from karafun_manager.models.Cancion import Cancion
@@ -276,6 +276,20 @@ def abrir_carpeta(request):
             body = json.loads(request.body)
             key = body.get('key')
             result = open_carpeta(key)
+            return JsonResponse(result)
+        except Exception as e:
+            msg = _log_print("ERROR",f"{e}")
+            logger.error(msg)
+            return JsonResponse({'success': False, 'message': str(e)})
+    return JsonResponse({'success': False, 'message': 'Método no permitido'})
+
+@csrf_exempt
+def ver_archivos(request):
+    if request.method == 'POST':
+        try:
+            body = json.loads(request.body)
+            key = body.get('key')
+            result = view_files(key)
             return JsonResponse(result)
         except Exception as e:
             msg = _log_print("ERROR",f"{e}")

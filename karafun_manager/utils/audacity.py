@@ -57,3 +57,31 @@ def open_carpeta(key: str) -> dict:
         msg = _log_print("ERROR",f"No se pudo abrir la carpeta: {e}")
         logger.error(msg)
         return {"success": False, "message": msg}
+
+def view_files(key: str) -> dict:
+    dest_dir = os.path.join(config.get_path_main(), key)
+    if not os.path.exists(dest_dir):
+        msg = _log_print("ERROR", f"No se encontró la carpeta: {dest_dir}")
+        logger.error(msg)
+        return {"success": False, "message": msg}
+    try:
+        tree = build_file_tree(dest_dir)
+        return {"success": True, "data": tree}
+    except Exception as e:
+        msg = _log_print("ERROR", f"No se pudo abrir la carpeta: {e}")
+        logger.error(msg)
+        return {"success": False, "message": msg}
+
+def build_file_tree(path: str) -> dict:
+    if os.path.isfile(path):
+        return {"type": "file", "name": os.path.basename(path)}
+    # Si es carpeta
+    children = []
+    for item in os.listdir(path):
+        item_path = os.path.join(path, item)
+        children.append(build_file_tree(item_path))
+    return {
+        "type": "directory",
+        "name": os.path.basename(path),
+        "children": children
+    }

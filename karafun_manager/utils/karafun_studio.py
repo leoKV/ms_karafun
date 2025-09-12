@@ -163,6 +163,7 @@ def recrear_kfn(key:str, archivos: list[str], audio:str, fondo: str, opc: int) -
     try:
         song_dir = os.path.join(config.get_path_main(), key)
         extract_dir = os.path.join(song_dir, 'kfn_temp')
+        fondos_path = config.get_path_img_fondo()
         # Obtener archivos actuales en extract_dir
         archivos_actuales = os.listdir(extract_dir)
         # Archivos eliminados.
@@ -181,7 +182,13 @@ def recrear_kfn(key:str, archivos: list[str], audio:str, fondo: str, opc: int) -
             if os.path.exists(src):
                 shutil.copy2(src, dst)
             else:
-                msg = _log_print("WARNING",f"El archivo {f} no existe en {song_dir}")
+                ext = os.path.splitext(f)[1].lower()
+                if ext in [".jpg", ".png"]:
+                    fondo_src = os.path.join(fondos_path, f)
+                    if os.path.exists(fondo_src):
+                        shutil.copy2(fondo_src, dst)
+                        continue
+                msg = _log_print("WARNING",f"No se encontró el archivo {f}.")
                 logger.warning(msg)
         # 3. Actualizar Song.ini
         actualizar_song_ini(extract_dir, audio, fondo)
