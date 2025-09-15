@@ -61,3 +61,7 @@ docker-compose.override.yml
 .env
 # Settings
 ms_karafun/settings.py
+
+/build
+
+/dist
