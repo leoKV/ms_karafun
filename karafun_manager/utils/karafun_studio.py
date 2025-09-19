@@ -374,21 +374,79 @@ def finalizar_karaoke(key: str) -> dict:
                 return {"success": False, "message": "No se encontró Song.ini en el KFN extraído."}
             with open(song_ini, "r", encoding="utf-8", errors="ignore") as song_ini_file:
                 song_ini_content = song_ini_file.read()
-            # 7) Actualizar Song.ini en la Base de Datos.
-        r = repo.update_song_ini(key, song_ini_content)
-        # Si fue posible actualizar el Song.ini se prosigue.
+        # 7) Actualizar Song.ini en la Base de Datos.
+        render_ini = None
+        from karafun_manager.utils.drive_manager import upload_kfn, clean_drive
+        if any(archivo in archivos_kfn for archivo in expected_files):
+            upload_kfn(key)
+            clean_drive(key,1)
+            render_ini = False
+        else:
+            clean_drive(key,2)
+            render_ini = True
+        r = repo.update_song_ini(key, song_ini_content, render_ini)
         if r:
-            #8) Eliminar archivos locales.
             if song_dir and os.path.exists(song_dir):
                 shutil.rmtree(song_dir)
-            # 9) Eliminar archivos en Google Drive.
-            from karafun_manager.utils.drive_manager import upload_kfn, clean_drive
-            if any(archivo in archivos_kfn for archivo in expected_files):
-                # 10) Subir KFN a Drive.
-                upload_kfn(key)
-                clean_drive(key,1)
-            else:
-                clean_drive(key,2)
+            return {"success": True, "message": "Song.ini Actualizado"}
+        return {"success": False, "message": 'No se pudo Actualizar Song.ini'}
+    except UnicodeDecodeError as e:
+        msg = _log_print("ERROR",f"Error de decodificación: {str(e)}")
+        logger.error(msg)
+        return {'success': False, 'message': msg}
+    except Exception as e:
+        msg = _log_print("ERROR",f"{str(e)}")
+        logger.error(msg)
+        return {'success': False, 'message': msg}
+    finally:
+        if extract_dir and os.path.exists(extract_dir):
+            try:
+                shutil.rmtree(extract_dir)
+            except Exception as e:
+                msg = _log_print("ERROR",f"No se pudo eliminar el directorio temporal {extract_dir}: {str(e)}")
+                logger.error(msg)
+
+def render_song_ini(key: str) -> dict:
+    extract_dir = None
+    try:
+        repo = CancionRepository()
+        song_dir = os.path.join(config.get_path_main(), key)
+        kfn_path = os.path.join(song_dir, 'kara_fun.kfn')
+        if not os.path.isdir(song_dir):
+            return {"success": False, "message": f"No se encontró la carpeta local para la key: {key}"}
+        if not os.path.isfile(kfn_path):
+            return {"success": False, "message": f"No se encontró el archivo local kara_fun.kfn para la key: {key}"}
+        extract_dir = os.path.join(song_dir, 'kfn_temp_4')
+        with open(kfn_path, 'rb') as f:
+            # 1) Firma.
+            if _read_exact(f, 4) != b'KFNB':
+                msg = 'Archivo inválido: firma KFNB no encontrada.'
+                print(msg)
+                logger.error(msg)
+                return {'success': False, 'message': msg}
+            # 2) Tags - ENDH.
+            _read_tag_block(f)
+            # 3) Tabla de archivos.
+            entries, data_base = _read_files_table(f)
+            # 4) Extraer archivos.
+            archivos_extraidos = _extract_files(f, entries, data_base, extract_dir)
+            # 5) Obtener Lista de archivos del KFN.
+            archivos_kfn = [os.path.basename(p) for p in archivos_extraidos]
+            expected_files = ["sin_voz.mp3", "con_voz.mp3"]
+            # 6) Obtener Song.ini.
+            song_ini = os.path.join(extract_dir, "Song.ini")
+            if not os.path.isfile(song_ini):
+                return {"success": False, "message": "No se encontró Song.ini en el KFN extraído."}
+            with open(song_ini, "r", encoding="utf-8", errors="ignore") as song_ini_file:
+                song_ini_content = song_ini_file.read()
+        # 7) Actualizar Song.ini en la Base de Datos.
+        render_ini = True
+        from karafun_manager.utils.drive_manager import upload_kfn
+        if any(archivo in archivos_kfn for archivo in expected_files):
+            render_ini = False
+            upload_kfn(key)
+        r = repo.update_song_ini(key, song_ini_content, render_ini)
+        if r:
             return {"success": True, "message": "Song.ini Actualizado"}
         return {"success": False, "message": 'No se pudo Actualizar Song.ini'}
     except UnicodeDecodeError as e:
