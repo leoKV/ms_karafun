@@ -11,11 +11,10 @@ class CancionRepository:
             result = cursor.fetchone()
         if result:
             return result[0]
-        else:
-            msg = _log_print("WARNING","No se encontro el link para la carpeta kia_songs.")
-            logger.warning(msg)
-            return ''
-        
+        msg = _log_print("WARNING","No se encontro el link para la carpeta kia_songs.")
+        logger.warning(msg)
+        return ''
+
     def get_song_ini(self, cancion_id):
         with connections['default'].cursor() as cursor:
             cursor.execute(
@@ -30,20 +29,18 @@ class CancionRepository:
                 "songini": result[0],
                 "letra": result[1]
             }
-        else:
-            msg = _log_print("WARNING",f"No se encontro la información para la canción con ID: {cancion_id}")
-            logger.warning(msg)
-            return None
-    
+        msg = _log_print("WARNING",f"No se encontro Song.ini para la canción con ID: {cancion_id}")
+        logger.warning(msg)
+        return None
+
     def get_porcentaje_kfn(self):
         with connections['default'].cursor()  as cursor:
             cursor.execute("select * from public.sps_porcentaje_kfn()")
             result = cursor.fetchone()
         if result:
             return result[0]
-        else:
-            return 80
-    
+        return 80
+
     def update_porcentaje_avance(self, cancion_id, porcentaje):
         with connections['default'].cursor() as cursor:
             cursor.execute(
@@ -52,14 +49,14 @@ class CancionRepository:
                 """,
                 [ cancion_id, porcentaje]
             )
-    
-    def update_song_ini(self, key, song_ini):
+
+    def update_song_ini(self, key, song_ini, render_ini):
         with connections['default'].cursor() as cursor:
             cursor.execute(
                 """
-                select * from public.spu_song_ini_2(%s, %s)
+                select * from public.spu_song_ini_2(%s, %s, %s)
                 """,
-                [key, song_ini]
+                [key, song_ini, render_ini]
             )
             result = cursor.fetchone()
         if result and len(result[0]) > 0:
@@ -72,4 +69,3 @@ class CancionRepository:
         msg = _log_print("WARNING", "La función spu_song_ini_2 no devolvió resultados.")
         logger.warning(msg)
         return False
-    

@@ -9,9 +9,9 @@ import json
 from ms_karafun import config
 from concurrent.futures import ThreadPoolExecutor
 from karafun_manager.repositories.cancion_repository import CancionRepository
-from karafun_manager.utils.drive_manager import search_kfn, download_all_files, upload_kfn, download_k, verificar_audio
-from karafun_manager.utils.audacity import open_audacity, open_carpeta
-from karafun_manager.utils.karafun_studio import manipular_kfn, recrear_kfn, verificar_kfn, finalizar_karaoke
+from karafun_manager.utils.drive_manager import search_kfn, download_all_files, download_k, verificar_audio
+from karafun_manager.utils.audacity import open_audacity, open_carpeta, view_files
+from karafun_manager.utils.karafun_studio import manipular_kfn, recrear_kfn, verificar_kfn, finalizar_karaoke, render_song_ini
 from karafun_manager.utils.print import _log_print
 from karafun_manager.models.Cancion import Cancion
 from karafun_manager.services.KaraokeFUNForm import KaraokeFunForm
@@ -57,13 +57,13 @@ def subir_karafun(request):
             cantidad = len(keys)
             resultados = []
             def worker(key):
-                result = upload_kfn(key)
+                result = render_song_ini(key)
                 return {'key': key, 'resultado': result}
             with ThreadPoolExecutor(max_workers= cantidad) as executor:
                 futures = [executor.submit(worker, key) for key in keys]
                 for future in futures:
                     resultados.append(future.result())
-            return JsonResponse({'success': True, 'message': '¡Archivo(s) KFN Subido(s) a Google Drive!'})
+            return JsonResponse({'success': True, 'message': '¡Validación de Song.ini Completada!'})
         except Exception as e:
             msg = _log_print("ERROR",f"{e}")
             logger.error(msg)
@@ -112,7 +112,7 @@ def crear_karafun(request):
                 msg = _log_print("ERROR","No se pudieron obtener datos de Songini.")
                 logger.error(msg)
                 return JsonResponse({'success': False, 'message': 'No se pudieron obtener datos de Songini.'})
-            song_ini = datos.get("songini") or "" 
+            song_ini = datos.get("songini") or ""
             letra = datos.get("letra") or ""
             # Construir Objeto de Cancion.
             cancion = Cancion(
@@ -284,6 +284,20 @@ def abrir_carpeta(request):
     return JsonResponse({'success': False, 'message': 'Método no permitido'})
 
 @csrf_exempt
+def ver_archivos(request):
+    if request.method == 'POST':
+        try:
+            body = json.loads(request.body)
+            key = body.get('key')
+            result = view_files(key)
+            return JsonResponse(result)
+        except Exception as e:
+            msg = _log_print("ERROR",f"{e}")
+            logger.error(msg)
+            return JsonResponse({'success': False, 'message': str(e)})
+    return JsonResponse({'success': False, 'message': 'Método no permitido'})
+
+@csrf_exempt
 def delete_carpeta(request):
     if request.method == 'POST':
         try:
@@ -402,3 +416,5 @@ def terminar_canciones(request):
             logger.error(msg)
             return JsonResponse({'success': False, 'message': str(e)})
     return JsonResponse({'success': False, 'message': 'Método no permitido'})
+
+
