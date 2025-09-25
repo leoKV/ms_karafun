@@ -44,3 +44,35 @@ Antes de comenzar, asegúrate de tener instalado lo siguiente:
    ```bash
    venv\Scripts\activate
    python manage.py runserver 127.0.0.1:5000
+
+---
+
+### Generar el ejecutable (.exe) del microservicio
+
+
+Antes de generar el ejecutable (.exe) asegúrate de tener instalado la librería de pyinstaller en el **proyecto**:
+
+```
+venv\Scripts\activate
+pip install pyinstaller
+```
+
+Actualizar las libreiras del proyecto
+
+```bash
+pip install -r requirements.txt
+```
+
+---
+
+1. **En la terminal de la raíz del proyecto ejecutar**:   
+
+```bash
+pyinstaller --clean --noconfirm ms_local.spec
+```
+
+2. Esto generará la carpeta **dist/** en donde se encontrara el ejecutable (.exe) del microservicio
+
+**Nota:** Antes de ejecutar el **.exe** modificar la cadena de conexión que se encuentran en el archivo ``config.json`` dentro de la carpeta ``_internal ``. Una vez modificados los valores guardar los cambios del archivo y ejecutar el .exe.
+
+**Consideraciones:** Se debe pasar toda la carpeta **dist/** al usuario final para que funcione el ejecutable (.exe) correctamente. Además que el usuario final debe de modificar la cadena de conexión del archivo `config.json` como se especifico previamente.
